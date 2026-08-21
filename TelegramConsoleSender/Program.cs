@@ -5,46 +5,63 @@ using System.Threading.Tasks;
 
 namespace TelegramSender
 {
+    public class TelegramGroup
+    {
+        public string Name { get; set; } = string.Empty;
+        public string ChatId { get; set; } = string.Empty;
+    }
+
     internal class Program
     {
-        // Telegram Bot Token 與 目標群組 Chat ID
+        // Telegram Bot Token
         private const string BotToken = "8893171713:AAEs62GcENHAK_Ursn9sfMH_DhSi6AEjklk";
-        private const string ChatId = "-5286846277"; // 文化大學大倫館
+
+        // 已設定的群組清單
+        private static readonly List<TelegramGroup> TargetGroups = new List<TelegramGroup>
+        {
+            new TelegramGroup { Name = "文化大學大倫館", ChatId = "-5286846277" },
+            new TelegramGroup { Name = "文化大學大雅館", ChatId = "-5369953878" }
+        };
 
         static async Task Main(string[] args)
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             Console.WriteLine("==============================================");
-            Console.WriteLine("🚀 Telegram 群組訊息發送器 (C# Console)");
+            Console.WriteLine("🚀 Telegram 多群組訊息發送器 (C# Console)");
             Console.WriteLine("==============================================");
-            Console.WriteLine("目標群組：文化大學大倫館 (Chat ID: " + ChatId + ")");
+            Console.WriteLine("目前已設定群組清單：");
+            for (int i = 0; i < TargetGroups.Count; i++)
+            {
+                Console.WriteLine(string.Format("  [{0}] {1} (Chat ID: {2})", i + 1, TargetGroups[i].Name, TargetGroups[i].ChatId));
+            }
             Console.WriteLine("----------------------------------------------");
 
-            string message = "📢 [測試發送] 您好！這是一則來自 C# 終端機程式的自動推播訊息！ (發送時間：" + DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + ")";
-
-            if (args.Length > 0 && !string.IsNullOrWhiteSpace(args[0]))
-            {
-                message = args[0];
-            }
+            string defaultMessage = "📢 [多群組測試] 您好！這是一則來自 C# 終端機程式的自動推播訊息！ (發送時間：" + DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss") + ")";
+            string message = args.Length > 0 && !string.IsNullOrWhiteSpace(args[0]) ? args[0] : defaultMessage;
 
             Console.WriteLine("準備發送內容：" + message);
-            Console.WriteLine("\n⏳ 正在發送訊息至 Telegram 群組...");
+            Console.WriteLine("\n⏳ 開始依序發送訊息至各群組...\n");
 
-            bool success = await SendTelegramMessageAsync(BotToken, ChatId, message);
-
-            if (success)
+            foreach (var group in TargetGroups)
             {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("✅ 訊息發送成功！請至 Telegram「文化大學大倫館」群組查看。");
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("❌ 訊息發送失敗，請檢查網路或權限設定。");
+                Console.Write(string.Format("👉 發送中 -> {0} ({1})... ", group.Name, group.ChatId));
+                bool success = await SendTelegramMessageAsync(BotToken, group.ChatId, message);
+
+                if (success)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("✅ 成功！");
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("❌ 失敗！");
+                }
+                Console.ResetColor();
             }
 
-            Console.ResetColor();
             Console.WriteLine("----------------------------------------------");
+            Console.WriteLine("🎉 所有群組發送作業執行完畢！");
         }
 
         /// <summary>
@@ -75,13 +92,13 @@ namespace TelegramSender
                     }
                     else
                     {
-                        Console.WriteLine("API 回傳錯誤：" + responseString);
+                        Console.WriteLine("\n[API 回傳錯誤] " + responseString);
                         return false;
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("發送發生例外異常：" + ex.Message);
+                    Console.WriteLine("\n[例外異常] " + ex.Message);
                     return false;
                 }
             }
