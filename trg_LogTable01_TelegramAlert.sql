@@ -1,13 +1,14 @@
 ﻿-- ============================================================================
--- SQL Server Trigger: LogTable01 警報即時通知發報
+-- SQL Server Trigger: LogTable01 警報即時通知發報 (正式遠端標準版)
 -- 資料庫: JINGSI_Database01
 -- 資料表: LogTable01
--- 欄位: Chrono (bigint), Name (varchar), EvtTitle (varchar), Description (varchar), AlarmState (smallint)
+-- 執行檔路徑: C:\TriggerTelegram\TriggerTelegramSender.exe
 -- 觸發條件: INSERT / UPDATE 且 AlarmState = 3
 -- 說明: 將 Chrono, Name, EvtTitle, Description 打包成 Base64 JSON 格式，
 --       透過 start /b 非同步脫鉤呼叫 TriggerTelegramSender.exe，交易 0 延遲。
 -- ============================================================================
 
+-- 1. 啟用 xp_cmdshell (若已啟用可略過)
 USE master;
 GO
 EXEC sp_configure 'show advanced options', 1;
@@ -17,6 +18,7 @@ EXEC sp_configure 'xp_cmdshell', 1;
 RECONFIGURE;
 GO
 
+-- 2. 建立/更新 Trigger
 USE JINGSI_Database01;
 GO
 
@@ -41,8 +43,8 @@ BEGIN
     DECLARE @Base64 NVARCHAR(MAX);
     DECLARE @Cmd NVARCHAR(4000);
     
-    -- 設定發報執行檔完整路徑
-    DECLARE @ExePath NVARCHAR(500) = 'D:\project\TriggerTelegram\TriggerTelegramSender\bin\Debug\net8.0\TriggerTelegramSender.exe';
+    -- 👉 正式路徑設定：C:\TriggerTelegram\TriggerTelegramSender.exe
+    DECLARE @ExePath NVARCHAR(500) = 'C:\TriggerTelegram\TriggerTelegramSender.exe';
 
     -- 只抓取 AlarmState = 3 的變更紀錄 (精確比對欄位名稱 AlarmState)
     SELECT TOP 1
@@ -65,7 +67,7 @@ BEGIN
         -- 2. 組合 JSON 字串
         SET @Json = N'{"Chrono":"' + @Chrono + N'","Name":"' + @Name + N'","EvtTitle":"' + @EvtTitle + N'","Description":"' + @Description + N'"}';
 
-        -- 3. 將 JSON 轉為 Base64 (SQL 原生 XML Binary 轉換，跨系統相容)
+        -- 3. 將 JSON 轉為 Base64 (SQL 原生 XML Binary 轉換)
         SELECT @Base64 = CAST(N'' AS XML).value('xs:base64Binary(xs:hexBinary(sql:column("bin")))', 'VARCHAR(MAX)')
         FROM (SELECT CAST(@Json AS VARBINARY(MAX)) AS bin) AS t;
 
