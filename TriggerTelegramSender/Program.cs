@@ -38,45 +38,39 @@ class Program
 
         if (args.Length > 0)
         {
-            string rawArg = string.Join(" ", args).Trim();
-
-            // 判斷傳入的是 Base64、直接 JSON 還是純文字
-            if (rawArg.StartsWith("--base64", StringComparison.OrdinalIgnoreCase))
+            // 若第一個參數是 --base64，取第二個參數
+            if (args[0].Equals("--base64", StringComparison.OrdinalIgnoreCase) && args.Length > 1)
             {
-                try
-                {
-                    string base64Str = rawArg.Substring(8).Trim().Trim('\"', '\'');
-                    byte[] bytes = Convert.FromBase64String(base64Str);
-                    string jsonStr = Encoding.UTF8.GetString(bytes);
-                    payload = JsonSerializer.Deserialize<AlarmPayload>(jsonStr, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new AlarmPayload();
-                    Console.WriteLine("[模式] 成功解析 Base64 JSON 格式資料！");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[錯誤] 解析 Base64 失敗: {ex.Message}");
-                    payload.Description = rawArg;
-                }
-            }
-            else if (rawArg.StartsWith("{") && rawArg.EndsWith("}"))
-            {
-                try
-                {
-                    payload = JsonSerializer.Deserialize<AlarmPayload>(rawArg, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new AlarmPayload();
-                    Console.WriteLine("[模式] 成功解析直接 JSON 格式資料！");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[錯誤] 解析 JSON 失敗: {ex.Message}");
-                    payload.Description = rawArg;
-                }
+                string base64Str = args[1].Trim('\"', '\'');
+                payload = ParseBase64Json(base64Str);
             }
             else
             {
-                // 純文字傳入
-                payload.Description = rawArg;
-                payload.Name = "手動通報";
-                payload.EvtTitle = "即時通知";
-                Console.WriteLine("[模式] 接收純文字參數模式。");
+                string rawArg = string.Join(" ", args).Trim();
+
+                if (rawArg.StartsWith("--base64", StringComparison.OrdinalIgnoreCase))
+                {
+                    string base64Str = rawArg.Substring(8).Trim().Trim('\"', '\'');
+                    payload = ParseBase64Json(base64Str);
+                }
+                else if (rawArg.StartsWith("{") && rawArg.EndsWith("}"))
+                {
+                    try
+                    {
+                        payload = JsonSerializer.Deserialize<AlarmPayload>(rawArg, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new AlarmPayload();
+                        Console.WriteLine("[模式] 成功解析直接 JSON 格式資料！");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[錯誤] 解析 JSON 失敗: {ex.Message}");
+                        payload.Description = rawArg;
+                    }
+                }
+                else
+                {
+                    // 嘗試直接當 Base64 解碼
+                    payload = ParseBase64Json(rawArg);
+                }
             }
         }
         else
@@ -116,6 +110,46 @@ class Program
             Console.WriteLine("❌ [失敗] 訊息發送未完成，請檢查網路或權限。");
             return 1;
         }
+    }
+
+    /// <summary>
+    /// 解析 Base64 字串為 AlarmPayload (自動適應 UTF-8 與 Unicode 雙字節編碼)
+    /// </summary>
+    private static AlarmPayload ParseBase64Json(string base64Str)
+    {
+        var payload = new AlarmPayload();
+        try
+        {
+            byte[] bytes = Convert.FromBase64String(base64Str);
+            
+            // 優先嘗試 UTF-16LE (SQL Server NVARCHAR CAST VARBINARY 預設編碼)
+            string jsonStr = Encoding.Unicode.GetString(bytes);
+            if (!jsonStr.Contains("\"") && !jsonStr.Contains("{"))
+            {
+                // 若失敗則嘗試 UTF-8
+                jsonStr = Encoding.UTF8.GetString(bytes);
+            }
+
+            payload = JsonSerializer.Deserialize<AlarmPayload>(jsonStr, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new AlarmPayload();
+            Console.WriteLine("[模式] 成功解析 Base64 JSON 格式資料！");
+        }
+        catch
+        {
+            try
+            {
+                // Fallback 嘗試 UTF-8
+                byte[] bytes = Convert.FromBase64String(base64Str);
+                string jsonStr = Encoding.UTF8.GetString(bytes);
+                payload = JsonSerializer.Deserialize<AlarmPayload>(jsonStr, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new AlarmPayload();
+                Console.WriteLine("[模式] 成功以 UTF-8 解析 Base64 JSON 格式資料！");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[錯誤] 解析 Base64 失敗: {ex.Message}");
+                payload.Description = base64Str;
+            }
+        }
+        return payload;
     }
 
     /// <summary>
