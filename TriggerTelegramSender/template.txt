@@ -1,5 +1,7 @@
 ﻿🚨【花蓮XX警報即時通知】
-📍 發生地點：花蓮
-📝 事件說明：{MESSAGE}
+📍 警報名稱：{NAME}
+⚠️ 事件標題：{TITLE}
+📝 詳細說明：{DESC}
+🔢 記錄編號：{CHRONO}
 📅 通報時間：{TIME}
 📡 JINGSI_Database01 監控系統 敬啟
